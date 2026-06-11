@@ -15,6 +15,7 @@ writes paper_ledger.csv; prints a dashboard incl. upcoming FOMC windows. Schedul
 """
 from __future__ import annotations
 import os
+import sys
 import numpy as np
 import pandas as pd
 
@@ -223,6 +224,62 @@ def volarb_section():
 # ---------------------------------------------------------------------------
 VOLBOOK_LEDGER = os.path.join(DATA_DIR, "paper_volbook_ledger.csv")
 VOLBOOK_INCEPTION = "2026-06-11"
+VOLBOOK_HALT = os.path.join(DATA_DIR, "volbook_halt.json")
+VOLBOOK_INCIDENTS = os.path.join(DATA_DIR, "volbook_incidents.log")
+STALE_DAYS = 14          # calendar days behind today before the feed is declared stale
+PNL_BOUND = 0.08         # |daily book return| beyond this = anomaly (hist. worst day -6.9%)
+
+
+def _volbook_kill_switches(book, sleeves):
+    """Kill-switch-first (Optiver doctrine): detect anomalies AUTOMATICALLY and halt
+    BEFORE diagnosing. Checks: (1) stale feeds, (2) daily P&L bound, (3) HARD data
+    corruption in book inputs. Returns a list of incident strings (empty = healthy)."""
+    import bookopt_harness as H
+    incidents = []
+    today = pd.Timestamp.now().normalize()
+
+    age = (today - book.index.max()).days
+    if age > STALE_DAYS:
+        incidents.append(f"STALE BOOK: tracker output ends {book.index.max().date()} "
+                         f"({age}d behind today; limit {STALE_DAYS}d)")
+    H._load()                                    # raw FEED staleness (not walk-forward truncation)
+    for n in sleeves:
+        raw_last = H._DATA[n][1].index.max()
+        a = (today - raw_last).days
+        if a > STALE_DAYS:
+            incidents.append(f"STALE FEED {n}: last raw bar {raw_last.date()} ({a}d old) — "
+                             f"instrument not on the daily update schedule?")
+
+    last_r = float(book.iloc[-1])
+    if abs(last_r) > PNL_BOUND:
+        incidents.append(f"PNL BOUND: last daily book return {last_r*100:+.1f}% exceeds "
+                         f"{PNL_BOUND*100:.0f}% (likely data error or regime anomaly)")
+
+    try:
+        from data_quality import audit_ohlcv
+        for _, uf, vf, _ in H.PAIRS:
+            for stem in (uf, vf):
+                p = os.path.join(DATA_DIR, stem + "_all_history.csv")
+                if not os.path.exists(p):
+                    continue
+                df = pd.read_csv(p, parse_dates=["Date"]).set_index("Date").sort_index()
+                hard = [i for i in audit_ohlcv(df, stem) if i.startswith("HARD")]
+                incidents.extend(hard)
+    except ImportError:
+        pass
+    return incidents
+
+
+def _halt(incidents):
+    """Write the halt state + incident log. Tracking stays suspended until --rearm."""
+    import json
+    from datetime import datetime
+    stamp = datetime.now().isoformat(timespec="seconds")
+    with open(VOLBOOK_HALT, "w", encoding="utf-8") as f:
+        json.dump({"halted_at": stamp, "incidents": incidents}, f, indent=1)
+    with open(VOLBOOK_INCIDENTS, "a", encoding="utf-8") as f:
+        for i in incidents:
+            f.write(f"{stamp}  {i}\n")
 
 
 def volbook_section():
@@ -234,7 +291,9 @@ def volbook_section():
 
     sleeves, infos = {}, {}
     for name, _, _, _ in H.PAIRS:
-        blend, _static, info = H.market(name, return_pos=True)
+        # emit_partial: include the trailing partial walk-forward window (params from the
+        # last completed train) so the tracker follows the PRESENT, not the last full block
+        blend, _static, info = H.market(name, return_pos=True, emit_partial=True)
         if blend is None:
             continue
         sleeves[name] = blend; infos[name] = info
@@ -250,6 +309,25 @@ def volbook_section():
     print("\n" + "=" * 86)
     print(f"VOL-BOOK PAPER TRACKER — multi-market floor book (1-DTE straddle, L4 frictions)   asof {today.date()}")
     print("=" * 86)
+
+    # ---- kill switches: halt FIRST, diagnose second -----------------------------------
+    if os.path.exists(VOLBOOK_HALT):
+        import json
+        h = json.load(open(VOLBOOK_HALT, encoding="utf-8"))
+        print(f"  ## HALTED since {h['halted_at']} — tracking SUSPENDED (book flat). Incidents:")
+        for i in h["incidents"]:
+            print(f"     - {i}")
+        print(f"  ## Fix the cause, then re-arm:  python paper_trade.py --rearm")
+        return
+    incidents = _volbook_kill_switches(book, sleeves)
+    if incidents:
+        _halt(incidents)
+        print(f"  ## KILL SWITCH TRIPPED — {len(incidents)} incident(s); book HALTED (flat), "
+              f"ledger update suspended:")
+        for i in incidents:
+            print(f"     - {i}")
+        print(f"  ## incidents -> {VOLBOOK_INCIDENTS} | re-arm after fixing: python paper_trade.py --rearm")
+        return
     raw_today = {n: (float(W[n].reindex([today]).fillna(0.0).iloc[0]) if today in W[n].index else 0.0)
                  for n in sleeves}
     tot = sum(v for v in raw_today.values() if v > 0) or 1.0     # normalize to book fractions
@@ -284,4 +362,11 @@ def volbook_section():
 
 
 if __name__ == "__main__":
+    if "--rearm" in sys.argv:
+        if os.path.exists(VOLBOOK_HALT):
+            os.remove(VOLBOOK_HALT)
+            print("vol-book RE-ARMED (halt cleared by operator). Tracking resumes next run.")
+        else:
+            print("vol-book is not halted; nothing to re-arm.")
+        sys.exit(0)
     main()

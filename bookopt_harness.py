@@ -28,7 +28,8 @@ def _load():
         idx = ret.index.intersection(vi.index)
         _DATA[name] = (df.loc[idx], ret.loc[idx], vi.loc[idx], sp)
 
-def market(name, gate=None, mult=1.0, fund_rf=0.0, margin_frac=0.15, return_pos=False):
+def market(name, gate=None, mult=1.0, fund_rf=0.0, margin_frac=0.15, return_pos=False,
+           emit_partial=False):
     """Gated blend sleeve + static, FULL L4 frictions. gate(ctx)->0/1 Series (causal!) ANDed onto signals.
     fund_rf: annual financing rate on posted margin (margin_frac of notional) charged per in-market day.
     Default fund_rf=0 -> no change to pre-existing results; set >0 for the P0.2 margin-funding sensitivity."""
@@ -74,6 +75,17 @@ def market(name, gate=None, mult=1.0, fund_rf=0.0, margin_frac=0.15, return_pos=
                 return x.mean()/x.std()*SQ if len(x)>60 and x.std()>0 else -9.
             kk = max(range(len(grid)), key=lambda i: shp(ser[i]))
             pp.append(ser[kk].reindex(te)); qq.append(poss[kk].reindex(te)); st += TEST
+        if emit_partial and pp and st < len(bi):
+            # trailing PARTIAL test window for live tracking — params from the last
+            # COMPLETED train window, so it is exactly as causal as the full blocks.
+            # Backtests keep the default (complete windows only) so published stats
+            # are unchanged; the paper tracker needs this to track the present.
+            tr = bi[st-TRAIN:st]; te = bi[st:]
+            def shp2(p):
+                x = p.reindex(tr).dropna()
+                return x.mean()/x.std()*SQ if len(x)>60 and x.std()>0 else -9.
+            kk = max(range(len(grid)), key=lambda i: shp2(ser[i]))
+            pp.append(ser[kk].reindex(te)); qq.append(poss[kk].reindex(te))
         if not pp: return None, None
         return pd.concat(pp).dropna(), pd.concat(qq)
     pA, qA = wf(sA,GA); pB, qB = wf(sB,GB)
