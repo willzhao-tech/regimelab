@@ -4,6 +4,12 @@
 in git). Consumed by bookopt_harness / bookopt_floor / paper_trade. Changing a value here
 is a strategy change: re-run the GAUNTLET (python gauntlet.py) before the tracker uses it."""
 
+import os
+
+# ---- environment (override for your machine; defaults = this research box) -----------
+DATA_DIR = os.environ.get("REGIMELAB_DATA_DIR", r"C:\Users\ASUS\Desktop\claude doc\1")
+PROXY = os.environ.get("REGIMELAB_PROXY", "http://127.0.0.1:7897")
+
 # ---- instrument / pricing -----------------------------------------------------------
 K = 0.82                  # 1-day IV / 30-day vol-index ratio (MEASURED, SPX VIX1D/VIX, ex 39)
 DT = 1.0 / 252.0

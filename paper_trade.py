@@ -19,7 +19,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-DATA_DIR = r"C:\Users\ASUS\Desktop\claude doc\1"
+DATA_DIR = os.environ.get("REGIMELAB_DATA_DIR", r"C:\Users\ASUS\Desktop\claude doc\1")
 ASSETS = {"NQ": "NQ_F_all_history.csv", "A50": "A50_all_history.csv"}
 WEIGHTS = {"NQ": 0.5, "A50": 0.5}
 VOL_WIN, TREND, TARGET, MAXLEV, COST = 63, 200, 0.15, 3.0, 0.0005

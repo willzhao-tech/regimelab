@@ -5,7 +5,7 @@ analogue of an experiment-tracking registry — makes "what did we run in March?
 import os, json, hashlib, subprocess
 from datetime import datetime
 
-DATA_DIR = r"C:\Users\ASUS\Desktop\claude doc\1"
+DATA_DIR = os.environ.get("REGIMELAB_DATA_DIR", r"C:\Users\ASUS\Desktop\claude doc\1")
 RUNS = os.path.join(DATA_DIR, "runs.jsonl")
 _PKG = os.path.dirname(os.path.abspath(__file__))
 

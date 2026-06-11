@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 import bookopt_harness as H, bookopt_floor as F, bookopt_stats as S
 from bookopt_runlog import log_run
 
-OUT = r"C:\Users\ASUS\Desktop\claude doc\1"
+OUT = H.OUT
 SQ = H.SQ
 
 

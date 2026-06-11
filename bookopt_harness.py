@@ -11,7 +11,7 @@ from math import erf
 
 import volbook_config as CFG
 
-OUT = r"C:\Users\ASUS\Desktop\claude doc\1"
+OUT = CFG.DATA_DIR
 SQ = np.sqrt(252.0); DT = CFG.DT; TRAIN, TEST = CFG.TRAIN, CFG.TEST; K = CFG.K
 PAIRS = CFG.PAIRS
 GA = CFG.GRID_A

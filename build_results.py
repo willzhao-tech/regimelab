@@ -4,11 +4,11 @@ The single source of truth. The working paper, README, and dashboard should cite
 never hand-type a statistic into prose. (Ported discipline from the semiconductor study, which hit
 the prose/code drift bug twice.) Regenerate: python build_results.py  ->  <DATA_DIR>/results.json"""
 import os, sys, json
-sys.path.insert(0, r"C:\Users\ASUS\Desktop\claude doc\market study\regimelab\regimelab\regimelab")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np, pandas as pd
 import bookopt_harness as H, bookopt_floor as F, bookopt_stats as S
 
-OUT = r"C:\Users\ASUS\Desktop\claude doc\1"; SQ = H.SQ
+OUT = H.OUT; SQ = H.SQ
 def r2(x): return None if x is None or (isinstance(x,float) and np.isnan(x)) else round(float(x), 4)
 
 def build_floor():

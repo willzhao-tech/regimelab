@@ -16,8 +16,8 @@ from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table, Tab
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-DATA_DIR = r"C:\Users\ASUS\Desktop\claude doc\1"
-PKG = r"C:\Users\ASUS\Desktop\claude doc\market study\regimelab\regimelab\regimelab"
+DATA_DIR = os.environ.get("REGIMELAB_DATA_DIR", r"C:\Users\ASUS\Desktop\claude doc\1")
+PKG = os.path.dirname(os.path.abspath(__file__))
 FONTS = r"C:\Windows\Fonts"
 
 META = dict(

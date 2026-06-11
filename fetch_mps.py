@@ -10,7 +10,7 @@ Writes FOMC_MPS.csv (Date, unscheduled, mps, mps_orth). Re-download via the Chin
 import os
 import pandas as pd
 
-DATA_DIR = r"C:\Users\ASUS\Desktop\claude doc\1"
+DATA_DIR = os.environ.get("REGIMELAB_DATA_DIR", r"C:\Users\ASUS\Desktop\claude doc\1")
 XLSX = os.path.join(DATA_DIR, "bauer_swanson_mps.xlsx")
 URL = "https://www.frbsf.org/wp-content/uploads/monetary-policy-surprises-data.xlsx"
 OUT = os.path.join(DATA_DIR, "FOMC_MPS.csv")

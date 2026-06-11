@@ -21,7 +21,7 @@ import numpy as np, pandas as pd
 import bookopt_harness as H, bookopt_floor as F, bookopt_stats as S
 from bookopt_runlog import log_run, vintage_digest
 
-OUT = r"C:\Users\ASUS\Desktop\claude doc\1"
+OUT = H.OUT
 checks = {}
 
 def check(name, ok, detail):

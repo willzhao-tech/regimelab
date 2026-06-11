@@ -34,8 +34,8 @@ from datetime import date, timedelta
 import pandas as pd
 
 OHLCV_COLS = ["Open", "High", "Low", "Close", "Volume"]
-DEFAULT_PROXY = "http://127.0.0.1:7897"
-DATA_DIR = r"C:\Users\ASUS\Desktop\claude doc\1"
+DEFAULT_PROXY = os.environ.get("REGIMELAB_PROXY", "http://127.0.0.1:7897")
+DATA_DIR = os.environ.get("REGIMELAB_DATA_DIR", r"C:\Users\ASUS\Desktop\claude doc\1")
 
 
 # ---------------------------------------------------------------------------

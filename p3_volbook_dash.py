@@ -3,13 +3,13 @@
 Equity / drawdown / rolling-Sharpe, attribution (legs, regime, per-market), k- & spread-sensitivity,
 time-in-market, and an honest stats+caveats header. Reuses bookopt_floor (single source of truth)."""
 import os, sys
-sys.path.insert(0, r"C:\Users\ASUS\Desktop\claude doc\market study\regimelab\regimelab\regimelab")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np, pandas as pd
 import bookopt_harness as H, bookopt_floor as F
 import plotly.graph_objects as go
 import plotly.io as pio
 
-OUT = r"C:\Users\ASUS\Desktop\claude doc\1"; SQ = H.SQ
+OUT = H.OUT; SQ = H.SQ
 CDN = '<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>'
 
 def fig_html(fig):

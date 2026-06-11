@@ -1,0 +1,18 @@
+# core research stack (pandas 2.3.x deliberately — 3.0 breaks pandas-datareader)
+numpy>=1.26
+pandas>=2.3,<3.0
+scipy>=1.11
+matplotlib>=3.8
+
+# data fetching
+requests>=2.31
+yfinance>=0.2
+
+# dashboard / paper pipeline
+plotly>=5.20
+reportlab>=4.0
+openpyxl>=3.1
+pypdf>=4.0
+
+# tests
+pytest>=8.0
