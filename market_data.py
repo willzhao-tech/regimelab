@@ -265,6 +265,13 @@ def update_dataset(csv_path, fetcher, earliest, overlap_days=1, proxy=DEFAULT_PR
 
     Re-fetches the last `overlap_days` so revised/late bars are picked up; fresh
     bars win on overlap. A missing file or schema change triggers a full rebuild.
+
+    Industry-discipline guards (prop-shop P1/P2 analogues):
+      - REVISION DETECTION: any overlap bar whose Close changes vs what is on disk
+        is logged loudly (vendors must not rewrite history silently);
+      - QUALITY GATE: the newly fetched rows are audited (data_quality.audit_ohlcv)
+        BEFORE the merge is committed — a HARD violation (High<Low, non-positive
+        Close, duplicate dates) aborts the write, so a corrupt tick never reaches disk.
     """
     existing = _load_existing(csv_path)
 
@@ -274,6 +281,37 @@ def update_dataset(csv_path, fetcher, earliest, overlap_days=1, proxy=DEFAULT_PR
         start = (existing.index.max() - timedelta(days=overlap_days)).strftime("%Y-%m-%d")
 
     fetched = fetcher(start, proxy)
+
+    # ---- revision detection on the overlap window --------------------------------
+    revisions = []
+    if not existing.empty and not fetched.empty:
+        common = existing.index.intersection(fetched.index)
+        if len(common):
+            old_c = existing.loc[common, "Close"].astype(float)
+            new_c = fetched.loc[common, "Close"].astype(float)
+            chg = ((new_c - old_c).abs() / old_c.abs().clip(lower=1e-12)) > 1e-4   # >1bp = real revision
+            for d in common[chg]:
+                revisions.append((d.date().isoformat(),
+                                  float(old_c.loc[d]), float(new_c.loc[d])))
+            for d, o, n in revisions:
+                print(f"  [REVISED] {os.path.basename(csv_path)} {d}: Close {o:g} -> {n:g}")
+
+    # ---- quality gate on the NEW rows (historical quirks on disk aren't re-litigated)
+    if not fetched.empty:
+        try:
+            from data_quality import audit_ohlcv
+            hard = [i for i in audit_ohlcv(fetched.dropna(subset=["Close"]),
+                                           os.path.basename(csv_path))
+                    if i.startswith("HARD")]
+        except ImportError:
+            hard = []
+        if hard:
+            print(f"  [GATE] REFUSING to commit {os.path.basename(csv_path)} — "
+                  f"corrupt fetch:\n    " + "\n    ".join(hard))
+            return {"rows_added": 0, "last_date": (existing.index.max().date().isoformat()
+                                                   if len(existing) else None),
+                    "total_rows": len(existing), "path": csv_path,
+                    "blocked": hard, "revisions": len(revisions)}
 
     combined = fetched if existing.empty else pd.concat([existing, fetched])
     combined = combined[~combined.index.duplicated(keep="last")].sort_index()
@@ -292,6 +330,7 @@ def update_dataset(csv_path, fetcher, earliest, overlap_days=1, proxy=DEFAULT_PR
         "last_date": (combined.index.max().date().isoformat() if len(combined) else None),
         "total_rows": len(combined),
         "path": csv_path,
+        "revisions": len(revisions),
     }
 
 
@@ -305,8 +344,12 @@ def update_one(name: str, proxy: str | None = DEFAULT_PROXY) -> dict:
 
 
 def _report(name: str, info: dict) -> None:
-    if info["rows_added"]:
-        print(f"[{name}] added {info['rows_added']} row(s); now {info['total_rows']} "
+    if info.get("blocked"):
+        print(f"[{name}] BLOCKED by quality gate ({len(info['blocked'])} HARD violation(s)); "
+              f"file unchanged at {info['total_rows']} rows through {info['last_date']}")
+    elif info["rows_added"]:
+        rev = f", {info['revisions']} revised" if info.get("revisions") else ""
+        print(f"[{name}] added {info['rows_added']} row(s){rev}; now {info['total_rows']} "
               f"rows through {info['last_date']}")
     else:
         print(f"[{name}] already up to date: {info['total_rows']} rows through {info['last_date']}")
