@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "regimelab"
+version = "0.1.0"
+description = "Regime-conditional evaluation of cross-asset allocation strategies"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["quant", "portfolio", "risk-parity", "trend-following", "regime-switching", "backtest"]
+dependencies = [
+    "numpy>=1.21",
+    "pandas>=1.3",
+]
+
+# Live data backends are OPTIONAL. The package runs without them; they are only
+# needed when fetching from the corresponding source. Each adapter degrades with
+# a clear error if its backend is absent.
+[project.optional-dependencies]
+data = [
+    "fredapi>=0.5",            # FRED macro / rates / FX / commodities / VIX
+    "pandas-datareader>=0.10", # Stooq prices + Fama-French factor library
+    "yfinance>=0.2",           # Yahoo prices (convenient, fragile, cached)
+]
+reporting = [
+    "matplotlib>=3.4",
+]
+dev = [
+    "pytest>=7.0",
+]
+full = [
+    "regimelab[data,reporting,dev]",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["regimelab*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

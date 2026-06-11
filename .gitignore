@@ -1,0 +1,13 @@
+# environments
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# generated build artifacts (regenerate from source + data)
+ssrn_submission/
+*.egg-info/
+
+# local scratch
+tmp_*.py
+_audit*.py
