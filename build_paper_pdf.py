@@ -223,6 +223,11 @@ def build(meta=META, out_pdf=None):
               Paragraph("<b>Keywords:</b> " + "; ".join(meta["keywords"]), S["small"]), Spacer(1, 3),
               Paragraph("<b>JEL classification:</b> " + ", ".join(meta["jel"]), S["small"]),
               Spacer(1, 3),
+              Paragraph("<b>Code availability:</b> the full research platform (backtest harness, "
+                        "causality tests, promotion gauntlet, paper-trading tracker) is open source "
+                        "at https://github.com/willzhao-tech/regimelab. Market data is not "
+                        "redistributed; fetch scripts are included.", S["small"]),
+              Spacer(1, 3),
               Paragraph("<b>AI disclosure.</b> " + _inline(meta["ai_disclosure"]), S["small"]),
               PageBreak()]
     story += _parse_body(md, S)
