@@ -43,6 +43,9 @@ for iid, stem, _ in INSTS:
 
 cats = {}
 cn = os.path.join(DATA, "catalyst_narratives.json")
+if not os.path.exists(cn):                                   # fresh clone: use the versioned copy
+    cn = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                      "research_archive", "catalyst_narratives.json")
 if os.path.exists(cn):
     raw = json.load(open(cn, encoding="utf-8"))
     for k, v in raw.items():

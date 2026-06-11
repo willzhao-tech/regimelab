@@ -136,7 +136,7 @@ class Widget(tk.Tk):
         self.stat = tk.Label(hdr, text="", bg=BG, fg=MUT, font=("Segoe UI", 9))
         self.stat.pack(side="left", padx=6)
         for txt, cmd in (("✕", self.destroy), ("📌", self.toggle_pin), ("↻", self.refresh),
-                         ("▤", self.open_dash)):
+                         ("▤", self.open_dash), ("📅", self.open_calendar)):
             b = tk.Label(hdr, text=txt, bg=BG, fg=MUT, font=("Segoe UI", 10), cursor="hand2")
             b.pack(side="right", padx=3)
             b.bind("<Button-1>", lambda e, c=cmd: c())
@@ -168,6 +168,22 @@ class Widget(tk.Tk):
 
     def open_dash(self):
         p = os.path.join(DATA, "volbook_dashboard.html")
+        if os.path.exists(p):
+            os.startfile(p)
+
+    def open_calendar(self):
+        """Open the master big-move calendar; generate it first if it doesn't exist yet."""
+        p = os.path.join(DATA, "master_calendar.html")
+        if not os.path.exists(p):
+            import subprocess, sys
+            pkg = os.path.dirname(os.path.abspath(__file__))
+            py = os.path.join(pkg, ".venv", "Scripts", "python.exe")
+            exe = py if os.path.exists(py) else sys.executable
+            try:
+                subprocess.run([exe, os.path.join(pkg, "build_master_calendar.py")],
+                               timeout=180, creationflags=0x08000000)   # no console window
+            except Exception:
+                return
         if os.path.exists(p):
             os.startfile(p)
 
