@@ -223,11 +223,15 @@ def volarb_section():
 # Tracks the actual production strategy: per-market state today + live calendar-basis P&L.
 # ---------------------------------------------------------------------------
 VOLBOOK_LEDGER = os.path.join(DATA_DIR, "paper_volbook_ledger.csv")
-VOLBOOK_INCEPTION = "2026-06-11"
 VOLBOOK_HALT = os.path.join(DATA_DIR, "volbook_halt.json")
 VOLBOOK_INCIDENTS = os.path.join(DATA_DIR, "volbook_incidents.log")
-STALE_DAYS = 14          # calendar days behind today before the feed is declared stale
-PNL_BOUND = 0.08         # |daily book return| beyond this = anomaly (hist. worst day -6.9%)
+# desk knobs live in volbook_config.py (versioned; change deliberately, then re-gauntlet)
+import sys as _sys
+_sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import volbook_config as CFG
+VOLBOOK_INCEPTION = CFG.VOLBOOK_INCEPTION
+STALE_DAYS = CFG.STALE_DAYS
+PNL_BOUND = CFG.PNL_BOUND
 
 
 def _volbook_kill_switches(book, sleeves):
@@ -254,6 +258,16 @@ def _volbook_kill_switches(book, sleeves):
     if abs(last_r) > PNL_BOUND:
         incidents.append(f"PNL BOUND: last daily book return {last_r*100:+.1f}% exceeds "
                          f"{PNL_BOUND*100:.0f}% (likely data error or regime anomaly)")
+
+    # operational live-drawdown policy (governance, NOT an alpha rule — the alpha DD-brake
+    # was tested and rejected as a vol-shrinkage artifact; this is a review trigger)
+    live = book[book.index >= pd.Timestamp(VOLBOOK_INCEPTION)]
+    if len(live) > 20:
+        eq = (1 + live).cumprod()
+        live_dd = float((eq / eq.cummax() - 1).min())
+        if live_dd < CFG.LIVE_MAXDD_HALT:
+            incidents.append(f"LIVE MAXDD: {live_dd*100:.0f}% breaches operational limit "
+                             f"{CFG.LIVE_MAXDD_HALT*100:.0f}% (backtest maxDD -20%; model under review)")
 
     try:
         from data_quality import audit_ohlcv
@@ -346,7 +360,7 @@ def volbook_section():
     # Same code path as the backtest, so any change in past ledger rows = data revision
     # (or a code change). Alert loudly + log; do NOT halt (revisions are legitimate-but-
     # must-be-visible). This is the live-vs-backtest deviation record (P3-12 doctrine).
-    led = pd.DataFrame({"book_ret": cal}).loc["2024-01-01":]
+    led = pd.DataFrame({"book_ret": cal}).loc[CFG.LEDGER_START:]
     led["cum_equity"] = (1 + led["book_ret"]).cumprod()
     if os.path.exists(VOLBOOK_LEDGER):
         old = pd.read_csv(VOLBOOK_LEDGER, parse_dates=["Date"]).set_index("Date")

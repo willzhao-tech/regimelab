@@ -9,13 +9,13 @@ import numpy as np
 import pandas as pd
 from math import erf
 
+import volbook_config as CFG
+
 OUT = r"C:\Users\ASUS\Desktop\claude doc\1"
-SQ = np.sqrt(252.0); DT = 1.0/252.0; TRAIN, TEST = 1260, 252; K = 0.82
-PAIRS = [("SPX","SPX","VIX",.025),("NQ","NQ_F","VXN",.025),("EEM","EEM","VXEEM",.025),
-         ("DAX","DAX","VDAX",.04),("SX5E","SX5E","VSTOXX",.04),("N225","N225","JNIV",.04),
-         ("HSI","HSI","VHSI",.04),("NIFTY","NSEI","INDIAVIX",.04)]
-GA = [(a,b,c) for a in (2.,4.,6.) for b in (0.,-2.) for c in (0.,1.,2.)]
-GB = [(b1,b2) for b1 in (.8,1.,1.2) for b2 in (1.3,1.6,2.)]
+SQ = np.sqrt(252.0); DT = CFG.DT; TRAIN, TEST = CFG.TRAIN, CFG.TEST; K = CFG.K
+PAIRS = CFG.PAIRS
+GA = CFG.GRID_A
+GB = CFG.GRID_B
 Nrm = lambda x: 0.5*(1.0+np.vectorize(erf)(x/np.sqrt(2.0)))
 
 _DATA = {}
@@ -28,7 +28,7 @@ def _load():
         idx = ret.index.intersection(vi.index)
         _DATA[name] = (df.loc[idx], ret.loc[idx], vi.loc[idx], sp)
 
-def market(name, gate=None, mult=1.0, fund_rf=0.0, margin_frac=0.15, return_pos=False,
+def market(name, gate=None, mult=1.0, fund_rf=0.0, margin_frac=CFG.MARGIN_FRAC, return_pos=False,
            emit_partial=False):
     """Gated blend sleeve + static, FULL L4 frictions. gate(ctx)->0/1 Series (causal!) ANDed onto signals.
     fund_rf: annual financing rate on posted margin (margin_frac of notional) charged per in-market day.
@@ -42,9 +42,9 @@ def market(name, gate=None, mult=1.0, fund_rf=0.0, margin_frac=0.15, return_pos=
     rich = vi - pk(21); trend = pk(10) - pk(42)
     rng = np.log(df["High"]/df["Low"])*100; be = vi/SQ
     spread = (pd.Series(sp0,index=idx)*(1+(vi/vi.rolling(63).median().shift(1)-1).clip(lower=0)).fillna(1.)).fillna(sp0)
-    if name == "EEM": spread = spread + 0.005
+    if name == "EEM": spread = spread + CFG.EEM_ASSIGN_SPREAD
     spread = spread*mult
-    eps = pd.Series(0.00125*np.where(np.arange(len(idx))%2,1,-1), index=idx)
+    eps = pd.Series(CFG.STRIKE_OFFSET*np.where(np.arange(len(idx))%2,1,-1), index=idx)
     ctx = dict(prem=prem, spread=spread, rich=rich, trend=trend, rng=rng, be=be, vi=vi, ret=ret)
     g = gate(ctx).reindex(idx).fillna(0.0) if gate is not None else pd.Series(1.0, index=idx)
     def sA(p):
@@ -61,7 +61,7 @@ def market(name, gate=None, mult=1.0, fund_rf=0.0, margin_frac=0.15, return_pos=
         payoff = prem.shift(1) - (ret-eps).abs()
         c = spread.shift(1)*prem.shift(1)*pos.abs()
         c = c + spread.shift(1)*prem.shift(1)*pos.abs().where(pos<0, 0.)     # long legs 2x
-        c = c.where(~(pos.abs()>0), np.maximum(c, 0.00015))                  # 1.5bp floor
+        c = c.where(~(pos.abs()>0), np.maximum(c, CFG.COST_FLOOR))           # 1.5bp floor
         fund = (fund_rf/252.0)*margin_frac*(pos.abs() > 0).astype(float)     # margin-financing drag, in-market days
         return (pos*payoff - c - fund).dropna()
     posof = lambda s: s.clip(-1,1).shift(1).fillna(0.)
@@ -108,7 +108,7 @@ def book_of(d, weights=None):
         bk = (P.sum(axis=1, skipna=True)/W.where(P.notna()).sum(axis=1)).dropna()
     else:
         bk = P.mean(axis=1, skipna=True).dropna()
-    lev = (0.10/(bk.rolling(63).std().shift(1)*SQ)).clip(upper=4.0)
+    lev = (CFG.TARGET_VOL/(bk.rolling(63).std().shift(1)*SQ)).clip(upper=CFG.LEV_CAP)
     return (lev*bk).dropna()
 
 def sharpe(r):

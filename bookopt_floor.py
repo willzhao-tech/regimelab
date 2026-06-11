@@ -5,8 +5,9 @@ Respects H.TRAIN/H.TEST/H.K at call time (monkeypatch those for window / k robus
 import numpy as np, pandas as pd
 from math import erf
 import bookopt_harness as H
+import volbook_config as CFG
 
-SQ = H.SQ; WIN = 252
+SQ = H.SQ; WIN = CFG.FLOOR_WIN
 Nrm = lambda x: 0.5*(1.0+np.vectorize(erf)(x/np.sqrt(2.0)))
 
 def invvol(p, win=WIN):                       # RISK only, NO return sign -> selection-free
@@ -16,9 +17,9 @@ def coverage_gate(name, mult=1.0, margin_bp=0.0, win=WIN):
     H._load(); df, ret, vi, sp0 = H._DATA[name]; idx = ret.index
     prem = pd.Series(2*(2*Nrm(0.5*(H.K*vi.values/100)*np.sqrt(H.DT))-1), index=idx)
     spread = (pd.Series(sp0,index=idx)*(1+(vi/vi.rolling(63).median().shift(1)-1).clip(lower=0)).fillna(1.)).fillna(sp0)
-    if name == "EEM": spread = spread + 0.005
+    if name == "EEM": spread = spread + CFG.EEM_ASSIGN_SPREAD
     spread = spread*mult
-    epsoff = pd.Series(0.00125*np.where(np.arange(len(idx))%2,1,-1), index=idx)
+    epsoff = pd.Series(CFG.STRIKE_OFFSET*np.where(np.arange(len(idx))%2,1,-1), index=idx)
     net = prem.shift(1)-(ret-epsoff).abs()-spread.shift(1)*prem.shift(1)
     edge = net.rolling(win).mean().shift(1)
     cov = (edge >= margin_bp*1e-4).astype(float).where(edge.notna(), 1.0)

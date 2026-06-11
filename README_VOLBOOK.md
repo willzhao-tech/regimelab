@@ -115,7 +115,32 @@ Shared code: `bookopt_harness.py` (sleeve P&L under L4 frictions, walk-forward, 
 - This research deliberately logged its own negative results and retracted artifacts; see
   `volbook_working_paper.md` (§ "What didn't work") and the regimelab memory notes.
 
-## 8. Publishing to SSRN
+## 8. Operations (industry-standards layer)
+
+Modeled on the verified prop-shop reference architecture (versioned, replayable, automatically
+checked — see the platform-architecture report):
+
+- **Versioning:** the package is a git repo; every result in `results.json` is pinned to the code
+  commit **and** SHA-256 hashes of all 16 input CSVs (`vintage` block).
+- **Desk config:** every knob lives in [volbook_config.py](volbook_config.py) (universe, k,
+  walk-forward, grids, frictions, vol target, kill-switch thresholds). Changing a value is a
+  strategy change — re-run the gauntlet before the tracker uses it.
+- **Ingestion guards:** `update_dataset()` logs vendor revisions (`[REVISED]`, >1bp Close change on
+  overlap) and **refuses** to commit fetches with HARD corruption (`[GATE]`) — a corrupt tick never
+  reaches disk. All 14 book inputs auto-update daily (Tue–Sat 05:45 scheduled task).
+- **Promotion gauntlet:** `python gauntlet.py` — 9 pre-registered checks (causality,
+  reproducibility, data quality, PSR, bootstrap CI, multiple-testing, 1.5× spread stress, regime
+  stability, placebo). Exit 0 = PROMOTED. Current floor book: **9/9**.
+- **Kill-switch-first tracking:** stale feed >14d, |daily P&L| >8%, HARD corruption, or live
+  maxDD < −25% → `volbook_halt.json` + incident log; tracking suspends until a human runs
+  `python paper_trade.py --rearm`. Pull first, diagnose second.
+- **Telemetry:** ledger **drift alerts** (past P&L rows changed = data revision impact),
+  `volbook_decisions.csv` per-market daily decision log (replayable audit trail),
+  `runs.jsonl` experiment log (every build/gauntlet run: code commit, data vintage, metrics).
+- **Weekly CI** (Sundays 08:00, scheduled task): pytest suite → `build_results.py` →
+  `gauntlet.py` → dashboard refresh; a REJECTED verdict is escalated.
+
+## 9. Publishing to SSRN
 
 SSRN has **no submission API** and its Terms of Use prohibit automated submission, so the pipeline is
 **prepare-and-handoff** — it never posts to SSRN.
