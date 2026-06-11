@@ -26,6 +26,28 @@ R["meta"] = {"data_through": str(book.index.max().date()), "start": str(book.ind
              "instrument": "1-DTE delta-hedged ATM straddle", "frictions": "L4 (stress-spread, 2x long-leg, "
              "discrete strikes, floors, EEM assignment, optional margin funding)"}
 
+# ---- data vintage + code version: pin every result to its exact inputs (P1 discipline) ----
+import hashlib, subprocess
+def _sha16(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()[:16]
+vintage = {}
+for _, uf, vf, _ in H.PAIRS:
+    for stem in (uf, vf):
+        p = os.path.join(OUT, stem + "_all_history.csv")
+        if os.path.exists(p) and stem not in vintage:
+            vintage[stem] = _sha16(p)
+try:
+    code_rev = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                              cwd=os.path.dirname(os.path.abspath(__file__)),
+                              capture_output=True, text=True, timeout=10).stdout.strip() or None
+except Exception:
+    code_rev = None
+R["vintage"] = {"code_commit": code_rev, "data_sha256_16": vintage}
+
 # ---- headline floor ----
 R["floor"] = {"sharpe_active": r2(S.sharpe_ann(book)), "sharpe_calendar": r2(S.sharpe_ann(cal)),
               "maxdd": r2(st["maxdd"]), "skew": r2(st["skew"]), "worst_day": r2(st["worst"]),

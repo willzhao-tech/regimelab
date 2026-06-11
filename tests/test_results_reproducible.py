@@ -36,6 +36,22 @@ def test_results_reproduce():
     for name, (live, stored) in checks.items():
         if abs(float(live) - float(stored)) > 1e-3:
             bad.append(f"{name}: live {live:.4f} != results.json {stored}")
+
+    # vintage diagnostic: if numbers drifted, say WHY (data changed vs code changed)
+    if bad and "vintage" in R:
+        import hashlib
+        def sha16(p):
+            h = hashlib.sha256()
+            with open(p, "rb") as fh:
+                for c in iter(lambda: fh.read(1 << 20), b""):
+                    h.update(c)
+            return h.hexdigest()[:16]
+        stored_v = R["vintage"].get("data_sha256_16", {})
+        drifted = [s for s, hv in stored_v.items()
+                   if os.path.exists(os.path.join(H.OUT, s + "_all_history.csv"))
+                   and sha16(os.path.join(H.OUT, s + "_all_history.csv")) != hv]
+        bad.append(f"(vintage: {len(drifted)} input file(s) changed since results.json: "
+                   f"{', '.join(drifted) or 'none — code-side drift!'})")
     assert not bad, "results.json is STALE — regenerate with build_results.py:\n  " + "\n  ".join(bad)
 
 
