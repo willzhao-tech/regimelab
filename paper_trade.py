@@ -342,9 +342,43 @@ def volbook_section():
     print(f"  -> {n_active}/{len(sleeves)} markets active tomorrow "
           f"(book steps OUT of sleeves whose trailing edge stops covering frictions)")
 
+    # ---- drift telemetry: did history change under our feet since the last run? --------
+    # Same code path as the backtest, so any change in past ledger rows = data revision
+    # (or a code change). Alert loudly + log; do NOT halt (revisions are legitimate-but-
+    # must-be-visible). This is the live-vs-backtest deviation record (P3-12 doctrine).
     led = pd.DataFrame({"book_ret": cal}).loc["2024-01-01":]
     led["cum_equity"] = (1 + led["book_ret"]).cumprod()
+    if os.path.exists(VOLBOOK_LEDGER):
+        old = pd.read_csv(VOLBOOK_LEDGER, parse_dates=["Date"]).set_index("Date")
+        common_d = old.index.intersection(led.index)
+        if len(common_d):
+            diff = (led.loc[common_d, "book_ret"] - old.loc[common_d, "book_ret"]).abs()
+            drifted = diff[diff > 1e-6]
+            if len(drifted):
+                from datetime import datetime
+                stamp = datetime.now().isoformat(timespec="seconds")
+                print(f"  !! DRIFT: {len(drifted)} past ledger day(s) changed since last run "
+                      f"(max |d|={drifted.max():.2e} on {drifted.idxmax().date()}) — "
+                      f"data revision or code change; see {os.path.basename(VOLBOOK_INCIDENTS)}")
+                with open(VOLBOOK_INCIDENTS, "a", encoding="utf-8") as f:
+                    f.write(f"{stamp}  DRIFT {len(drifted)} day(s), max {drifted.max():.2e} "
+                            f"on {drifted.idxmax().date()}\n")
     led.to_csv(VOLBOOK_LEDGER, index_label="Date")
+
+    # ---- decision log: append today's per-market state (replayable audit trail) --------
+    dec_path = os.path.join(DATA_DIR, "volbook_decisions.csv")
+    rows = []
+    for n in sleeves:
+        sig = 0.5 * infos[n]["posA"].iloc[-1] + 0.5 * infos[n]["posB"].iloc[-1]
+        rows.append({"Date": today.date().isoformat(), "market": n,
+                     "gate": "ON" if raw_today[n] > 0 else "out",
+                     "weight_frac": round(raw_today[n] / tot if raw_today[n] > 0 else 0.0, 4),
+                     "signal": sig})
+    dec = pd.DataFrame(rows)
+    if os.path.exists(dec_path):
+        prev = pd.read_csv(dec_path)
+        dec = pd.concat([prev[prev["Date"] != dec["Date"].iloc[0]], dec], ignore_index=True)
+    dec.to_csv(dec_path, index=False)
 
     live = cal.loc[cal.index >= pd.to_datetime(VOLBOOK_INCEPTION)]
     if len(live) > 1 and live.std() > 0:

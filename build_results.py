@@ -113,6 +113,11 @@ R["placebo"] = {"vs_random_x_coverage_pct": r2(placebo(True)), "vs_random_no_cov
 path = os.path.join(OUT, "results.json")
 with open(path, "w", encoding="utf-8") as f:
     json.dump(R, f, indent=2)
+from bookopt_runlog import log_run
+log_run("build_results", {"sharpe_active": R["floor"]["sharpe_active"],
+                          "sharpe_calendar": R["floor"]["sharpe_calendar"],
+                          "maxdd": R["floor"]["maxdd"]},
+        params={"TRAIN": H.TRAIN, "TEST": H.TEST, "K": H.K})
 print(f"results.json -> {path}")
 print(f"  floor active {R['floor']['sharpe_active']} | calendar {R['floor']['sharpe_calendar']} "
       f"| boot CI cal {R['inference']['boot_ci_calendar']} | FDR {R['inference']['fdr_survive']}/8 "
