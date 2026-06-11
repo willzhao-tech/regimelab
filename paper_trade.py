@@ -356,6 +356,15 @@ def volbook_section():
     print(f"  -> {n_active}/{len(sleeves)} markets active tomorrow "
           f"(book steps OUT of sleeves whose trailing edge stops covering frictions)")
 
+    try:                                            # scheduled-event awareness (information only)
+        from market_calendar import upcoming
+        up = upcoming(3)
+        evs = " | ".join(f"{r.date.date()} {r.event}{'~' if r.source == 'projected' else ''}"
+                         for r in up.itertuples())
+        print(f"  upcoming events: {evs}   (~ = projected date; FOMC vol lands D+1, x1.1-1.4 measured)")
+    except Exception:
+        pass
+
     # ---- drift telemetry: did history change under our feet since the last run? --------
     # Same code path as the backtest, so any change in past ledger rows = data revision
     # (or a code change). Alert loudly + log; do NOT halt (revisions are legitimate-but-
